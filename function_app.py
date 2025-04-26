@@ -56,12 +56,61 @@ def get_request(id: int) -> dict:
     reponse = requests.get( f"{DOMAIN}/api/request/{id}"  )
     return reponse.json()
 
-def get_pokemons( type: str ) -> dict:
-    pokeapi_url = f"https://pokeapi.co/api/v2/type/{type}"
-    response = requests.get(pokeapi_url, timeout=3000)
-    data = response.json()
-    pokemon_entries = data.get("pokemon", [] )
-    return [ p["pokemon"] for p in pokemon_entries ]
+def get_more_pokemon_detail(name: str) -> dict:
+    url = f"https://pokeapi.co/api/v2/pokemon/{name}"
+    response = requests.get(url)
+    poke_data = response.json()
+    poke_stats = {s['stat']['name']: s['base_stat'] for s in poke_data['stats']}
+    return poke_stats
+
+def get_pokemons(type: str) -> list:
+    try:
+        pokeapi_url = f"https://pokeapi.co/api/v2/type/{type}"
+        response = requests.get(pokeapi_url, timeout=3000)
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error with the API request: {e}")
+        return []
+    except ValueError as e:
+        print(f"Error parsing response JSON: {e}")
+        return []
+
+    pokemon_entries = data.get("pokemon", [])
+    pokemons = []
+
+    for entry in pokemon_entries:
+        try:
+            name = entry["pokemon"]["name"]
+            url = f'https://pokeapi.co/api/v2/pokemon/{name}'
+            response = requests.get(url, timeout=3000)
+            response.raise_for_status()
+            poke_data = response.json()
+            
+            poke_stats = {s['stat']['name']: s['base_stat'] for s in poke_data.get('stats', [])} #this for loop feels clean
+            
+            pokemon = {
+                "name": name,
+                "hp": poke_stats.get("hp"),
+                "attack": poke_stats.get("attack"),
+                "defense": poke_stats.get("defense"),
+                "special-attack": poke_stats.get("special-attack"),
+                "special-defense": poke_stats.get("special-defense"),
+                "speed": poke_stats.get("speed")
+            }
+            pokemons.append(pokemon)
+        except requests.exceptions.RequestException as e:
+            print(f"Error consiguiendo info de pokemon {name}: {e}")
+            continue
+        except KeyError as e:
+            print(f"Fallo en información obtenida {name}: {e}")
+            continue
+        except ValueError as e:
+            print(f"Error en parseo de datos de Pokemon {name}: {e}")
+            continue
+
+    return pokemons
+
 
 def generate_csv_to_blob( pokemon_list: list ) -> bytes:
     df = pd.DataFrame( pokemon_list )
