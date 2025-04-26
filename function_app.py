@@ -56,17 +56,11 @@ def get_request(id: int) -> dict:
     reponse = requests.get( f"{DOMAIN}/api/request/{id}"  )
     return reponse.json()
 
-def get_more_pokemon_detail(name: str) -> dict:
-    url = f"https://pokeapi.co/api/v2/pokemon/{name}"
-    response = requests.get(url)
-    poke_data = response.json()
-    poke_stats = {s['stat']['name']: s['base_stat'] for s in poke_data['stats']}
-    return poke_stats
 
-def get_pokemons(type: str) -> list:
+def get_pokemons(type: str, limit: int | None = None) -> list:
     try:
         pokeapi_url = f"https://pokeapi.co/api/v2/type/{type}"
-        response = requests.get(pokeapi_url, timeout=3000)
+        response = requests.get(pokeapi_url, timeout=10)
         response.raise_for_status()
         data = response.json()
     except requests.exceptions.RequestException as e:
@@ -77,18 +71,22 @@ def get_pokemons(type: str) -> list:
         return []
 
     pokemon_entries = data.get("pokemon", [])
+    
+    if limit is not None:
+        pokemon_entries = pokemon_entries[:limit]
+
     pokemons = []
 
     for entry in pokemon_entries:
         try:
             name = entry["pokemon"]["name"]
             url = f'https://pokeapi.co/api/v2/pokemon/{name}'
-            response = requests.get(url, timeout=3000)
+            response = requests.get(url, timeout=10)
             response.raise_for_status()
             poke_data = response.json()
-            
-            poke_stats = {s['stat']['name']: s['base_stat'] for s in poke_data.get('stats', [])} #this for loop feels clean
-            
+
+            poke_stats = {s['stat']['name']: s['base_stat'] for s in poke_data.get('stats', [])}
+
             pokemon = {
                 "name": name,
                 "hp": poke_stats.get("hp"),
@@ -100,13 +98,13 @@ def get_pokemons(type: str) -> list:
             }
             pokemons.append(pokemon)
         except requests.exceptions.RequestException as e:
-            print(f"Error consiguiendo info de pokemon {name}: {e}")
+            print(f"Error fetching info for Pokémon {name}: {e}")
             continue
         except KeyError as e:
-            print(f"Fallo en información obtenida {name}: {e}")
+            print(f"Missing info for Pokémon {name}: {e}")
             continue
         except ValueError as e:
-            print(f"Error en parseo de datos de Pokemon {name}: {e}")
+            print(f"Error parsing data for Pokémon {name}: {e}")
             continue
 
     return pokemons
